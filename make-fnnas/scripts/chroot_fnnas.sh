@@ -135,15 +135,32 @@ add_scripts() {
     mkdir -p /etc/initramfs/post-update.d
 
     # Create hook script to generate uInitrd
+    # Note: This heredoc is single-quoted, so variables are NOT expanded here.
+    # The hook must be self-contained and detect the correct mkimage arch at runtime.
     cat >/etc/initramfs/post-update.d/99-uboot <<'HOOK'
 #!/bin/bash
 # Generate uInitrd
 # $1 = kernel version
 
+set -euo pipefail
+
 tempname="/boot/uInitrd-$1"
 echo "update-initramfs: fnnas: Converting to u-boot format: ${tempname}..." >&2
-mkimage -A ${mkimage_arch} -O linux -T ramdisk -C none -n uInitrd -d "$2" "$tempname" >/dev/null 2>&1
-ln -sfv $(basename "$tempname") /boot/uInitrd >/dev/null 2>&1 || cp -fv "$tempname" /boot/uInitrd
+arch="$(uname -m 2>/dev/null || true)"
+mkarch="arm64"
+case "${arch}" in
+  armv7*|armhf) mkarch="arm" ;;
+  aarch64|arm64) mkarch="arm64" ;;
+esac
+
+mkimage -A "${mkarch}" -O linux -T ramdisk -C none -n uInitrd -d "$2" "$tempname" >/dev/null 2>&1
+
+if [[ ! -f "${tempname}" ]]; then
+  echo "update-initramfs: fnnas: ERROR: mkimage did not create ${tempname}" >&2
+  exit 1
+fi
+
+ln -sfv "$(basename "$tempname")" /boot/uInitrd >/dev/null 2>&1 || cp -fv "$tempname" /boot/uInitrd
 
 echo "update-initramfs: fnnas: done." >&2
 exit 0
