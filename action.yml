@@ -9,9 +9,17 @@ inputs:
     default: "fnnas"
   # For build fnnas -----
   fnnas_path:
-    description: "Set fnnas arm64 file path."
+    description: "Set fnnas base image file path or URL."
     required: false
     default: ""
+  fnnas_arch:
+    description: "Base image architecture (arm64/armhf)."
+    required: false
+    default: "arm64"
+  keep_kernel:
+    description: "Keep kernel from base image (recommended for armhf). true/false"
+    required: false
+    default: "false"
   fnnas_board:
     description: "Select device board."
     required: false
@@ -69,7 +77,9 @@ runs:
         # Get fnnas file input parameters, set work directory
         fnnas_filename="${{ inputs.fnnas_path }}"
         fnnas_savefile="${fnnas_filename##*/}"
-        fnnas_savepath="fnnas-arm64"
+        fnnas_arch="${{ inputs.fnnas_arch }}"
+        [[ -z "${fnnas_arch}" ]] && fnnas_arch="arm64"
+        fnnas_savepath="fnnas-${fnnas_arch}"
         fnnas_outpath="fnnas/out"
         echo -e "Get fnnas file input parameters: [ ${fnnas_filename} ]"
         [[ -z "${fnnas_filename}" ]] && echo -e "The [ fnnas_path ] variable must be specified." && exit 1
@@ -122,8 +132,10 @@ runs:
             [[ -n "${{ inputs.kernel_repo }}" ]] && make_command="${make_command} -r ${{ inputs.kernel_repo }}"
             [[ -n "${{ inputs.fnnas_kernel }}" ]] && make_command="${make_command} -k ${{ inputs.fnnas_kernel }}"
             [[ -n "${{ inputs.auto_kernel }}" ]] && make_command="${make_command} -a ${{ inputs.auto_kernel }}"
+            [[ -n "${fnnas_savepath}" ]] && make_command="${make_command} -p ${fnnas_savepath}"
             [[ -n "${{ inputs.fnnas_size }}" ]] && make_command="${make_command} -s ${{ inputs.fnnas_size }}"
             [[ -n "${{ inputs.builder_name }}" ]] && make_command="${make_command} -n ${{ inputs.builder_name }}"
+            [[ -n "${{ inputs.keep_kernel }}" ]] && make_command="${make_command} -x ${{ inputs.keep_kernel }}"
             read -r -a make_args <<< "${make_command}"
             sudo ./renas "${make_args[@]}"
 

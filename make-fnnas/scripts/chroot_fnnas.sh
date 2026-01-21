@@ -30,6 +30,12 @@ debs_platform="${1}"
 chroot_arch_info="$(arch)"
 initramfs_conf="/etc/initramfs-tools/update-initramfs.conf"
 kernel_version_output="/var/tmp/kernel_version_output"
+mkimage_arch="arm64"
+if [[ "${chroot_arch_info}" =~ ^(armv7|armv7l|armhf)$ ]]; then
+    mkimage_arch="arm"
+elif [[ "${chroot_arch_info}" =~ ^(aarch64|arm64)$ ]]; then
+    mkimage_arch="arm64"
+fi
 
 # Set font color
 STEPS="[\033[95m STEPS \033[0m]"
@@ -136,7 +142,7 @@ add_scripts() {
 
 tempname="/boot/uInitrd-$1"
 echo "update-initramfs: fnnas: Converting to u-boot format: ${tempname}..." >&2
-mkimage -A arm64 -O linux -T ramdisk -C none -n uInitrd -d "$2" "$tempname" >/dev/null 2>&1
+mkimage -A ${mkimage_arch} -O linux -T ramdisk -C none -n uInitrd -d "$2" "$tempname" >/dev/null 2>&1
 ln -sfv $(basename "$tempname") /boot/uInitrd >/dev/null 2>&1 || cp -fv "$tempname" /boot/uInitrd
 
 echo "update-initramfs: fnnas: done." >&2

@@ -104,6 +104,9 @@ boot_mb="512"
 root_mb="6144"
 # Set fnnas builder signature
 builder_name=""
+#
+# Keep original kernel files (for non-standard arch like armhf)
+keep_kernel="false"
 
 # Set font color
 STEPS="[\033[95m STEPS \033[0m]"
@@ -166,7 +169,7 @@ init_var() {
     echo -e "${STEPS} Start Initializing Variables..."
 
     # If it is followed by [ : ], it means that the option requires a parameter value
-    local options="b:r:k:a:p:s:n:"
+    local options="b:r:k:a:p:s:n:x:"
     parsed_args=$(getopt -o "${options}" -- "${@}")
     [[ ${?} -ne 0 ]] && error_msg "Parameter parsing failed."
     eval set -- "${parsed_args}"
@@ -208,6 +211,14 @@ init_var() {
                 error_msg "Invalid -a parameter [ ${2} ]!"
             fi
             ;;
+        -p | --Path)
+            if [[ -n "${2}" ]]; then
+                fnnas_path="${2%/}"
+                shift 2
+            else
+                error_msg "Invalid -p parameter [ ${2} ]!"
+            fi
+            ;;
         -s | --Size)
             if [[ -n "${2}" ]]; then
                 img_mb="${2}"
@@ -222,6 +233,14 @@ init_var() {
                 shift 2
             else
                 error_msg "Invalid -n parameter [ ${2} ]!"
+            fi
+            ;;
+        -x | --KeepKernel)
+            if [[ -n "${2}" ]]; then
+                keep_kernel="${2}"
+                shift 2
+            else
+                error_msg "Invalid -x parameter [ ${2} ]!"
             fi
             ;;
         --)
@@ -512,9 +531,12 @@ extract_fnnas() {
     cd ${tmp_fnnas}
 
     # Delete all files of /boot partition and replace it later
-    rm -rf boot/*
-    # Delete the kernel files and replace it later
-    rm -rf usr/lib/modules/*
+    # For keep_kernel=true, keep existing kernel/boot files from base image
+    if [[ ! "${keep_kernel}" =~ ^(true|yes)$ ]]; then
+        rm -rf boot/*
+        # Delete the kernel files and replace it later
+        rm -rf usr/lib/modules/*
+    fi
     # Delete apt cache files
     rm -rf var/cache/apt/archives/* var/cache/man/*
     # Delete the symbolic link files and relink it later
@@ -989,7 +1011,7 @@ loop_make() {
                     extract_fnnas
                     make_image
                     copy_files
-                    replace_kernel
+                    [[ ! "${keep_kernel}" =~ ^(true|yes)$ ]] && replace_kernel
                     refactor_bootfs
                     refactor_rootfs
                     clean_tmp
@@ -1020,7 +1042,7 @@ download_depends
 # Query the latest kernel version
 [[ "${auto_kernel}" =~ ^(true|yes)$ ]] && query_kernel
 # Download the kernel files
-download_kernel
+[[ ! "${keep_kernel}" =~ ^(true|yes)$ ]] && download_kernel
 
 # Show make settings
 echo -e "${INFO} [ ${#make_fnnas[@]} ] lists of fnnas board: [ $(echo ${make_fnnas[@]} | xargs) ]"
