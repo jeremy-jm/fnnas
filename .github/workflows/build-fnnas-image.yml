@@ -9,6 +9,19 @@ on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
+      fnnas_arch:
+        description: "Base image architecture (arm64/armhf)"
+        required: false
+        default: "arm64"
+        type: choice
+        options:
+          - arm64
+          - armhf
+      keep_kernel:
+        description: "Keep kernel from base image (recommended for armhf)"
+        required: false
+        default: false
+        type: boolean
       fnnas_base_version:
         description: "Select fnnas base image version"
         required: false
@@ -95,6 +108,7 @@ on:
           - rock5c
           - ruisen-box
           - s905
+          - ws1508
           - s905-beelink-mini
           - s905-mxqpro-plus
           - s905d
@@ -246,7 +260,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
+    if: ${{ github.event.repository.owner.id == github.event.sender.id }}
 
     steps:
       - name: Checkout
@@ -406,10 +420,12 @@ jobs:
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Packaging fnnas
-        if: ${{ steps.down.outputs.status }} == 'success' && !cancelled()
-        uses: ophub/fnnas@main
+        if: ${{ steps.down.outputs.status == 'success' && !cancelled() }}
+        uses: ./. 
         with:
           fnnas_path: fnnas/*.img.xz
+          fnnas_arch: ${{ inputs.fnnas_arch }}
+          keep_kernel: ${{ inputs.keep_kernel }}
           fnnas_board: ${{ inputs.fnnas_board }}
           fnnas_kernel: ${{ inputs.fnnas_kernel }}
           auto_kernel: ${{ inputs.auto_kernel }}
@@ -418,7 +434,7 @@ jobs:
 
       - name: Upload the packaged fnnas
         uses: ncipollo/release-action@main
-        if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
+        if: ${{ env.PACKAGED_STATUS == 'success' && !cancelled() }}
         with:
           tag: ${{ env.build_tag }}
           artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
